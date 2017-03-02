@@ -16,10 +16,10 @@ package cmd
 
 import (
 	"fmt"
-	"log"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"go_scoring/validate"
+	"log"
 )
 
 var cfgFile string
@@ -34,8 +34,8 @@ examples and usage of using your application. For example:
 Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
-// Uncomment the following line if your bare application
-// has an action associated with it:
+	// Uncomment the following line if your bare application
+	// has an action associated with it:
 	PreRun: func(cmd *cobra.Command, args []string) {
 		hostURL = validate.ValidateHost(
 			viper.GetString("host"))
@@ -91,8 +91,8 @@ func initConfig() {
 	}
 
 	viper.SetConfigName(".go_scoring") // name of config file (without extension)
-	viper.AddConfigPath("$HOME")  // adding home directory as first search path
-	viper.AutomaticEnv()          // read in environment variables that match
+	viper.AddConfigPath("$HOME")       // adding home directory as first search path
+	viper.AutomaticEnv()               // read in environment variables that match
 
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {

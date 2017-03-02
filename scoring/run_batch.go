@@ -3,8 +3,6 @@ package scoring
 import (
 	"bytes"
 	"fmt"
-	"github.com/buger/jsonparser"
-	"go_scoring/csv"
 	"io"
 	"io/ioutil"
 	"log"
@@ -14,11 +12,15 @@ import (
 	"runtime"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/buger/jsonparser"
+	"go_scoring/csv"
+	"time"
 )
 
 type Batch struct {
-	idx    int
-	buffer *bytes.Buffer
+	idx  int
+	data *bytes.Buffer
 }
 
 const (
@@ -45,20 +47,15 @@ func check(e error, msg string) {
 	}
 }
 
-func getCSVInput(dataset string) *csvtools.CSVInput {
-	file, err := os.Open(dataset)
-	defer file.Close()
-	check(err, "Failed to open predict source")
-
+func getCSVInput(file *os.File) *csvtools.CSVInput {
 	dt := csvtools.NewDetector()
 	delimiters := dt.DetectDelimiter(file, '"')
 
 	r, _ := utf8.DecodeRuneInString(delimiters[0])
-	// rewind file after detector finish work
+	// rewind file after detector finished it's work
 	file.Seek(0, 0)
 	opts := csvtools.CSVInputOptions{true, r, file}
 	csvInput, err := csvtools.NewCSVInput(&opts)
-	fmt.Println(csvInput.Header())
 	check(err, "Failed to initialize csv reader")
 
 	return csvInput
@@ -123,37 +120,59 @@ func RunBatch(
 	scoringEndpoint = baseUrl.String()
 	encoding = investigateEncoding(dataset, encoding, delimiter, delimiter)
 
-	csvInput := getCSVInput(dataset)
+	file, err := os.Open(dataset)
+	check(err, "Failed to open predict source")
+	defer file.Close()
+
+	csvInput := getCSVInput(file)
 
 	csvHeader := csvInput.Header()
 	buff := bytes.NewBufferString(strings.Join(csvHeader, ",") + "\n")
-	buff.WriteString(strings.Join(csvInput.ReadRecord(), ",") + "\n")
+	firstRow := csvInput.ReadRecord()
+	buff.WriteString(strings.Join(firstRow, ",") + "\n")
 
-	statusCode, body := sendScoringBatch(false, buff)
-	fmt.Println(statusCode)
-	processStatusCodes(statusCode, body)
+	//statusCode, body := sendScoringBatch(false, buff)
+	//fmt.Println(statusCode)
+	//processStatusCodes(statusCode, body)
 
-	fmt.Println(string(body))
+	//fmt.Println(string(body))
 
-	if execTime, err := jsonparser.GetInt(body, "execution_time"); err != nil {
-		log.Printf("Failed to read execution time: %s\n", err)
-	} else {
-		fmt.Printf("Execution time: %d\n", execTime)
+	//if execTime, err := jsonparser.GetInt(body, "execution_time"); err != nil {
+	//	log.Printf("Failed to read execution time: %s\n", err)
+	//} else {
+	//	fmt.Printf("Execution time: %d\n", execTime)
+	//}
+
+	queue := make(chan Batch, concurrent)
+	done := make(chan bool, 1)
+
+	for i := 0; i < concurrent; i++ {
+		go sendLine(i, queue)
 	}
-
-	done := make(chan bool, concurrent)
 
 	for i := 0; ; i++ {
 		buff := bytes.NewBufferString(strings.Join(csvHeader, ",") + "\n")
+		isLast := false
 
 		for buff.Len() < MAX_BATCH_SIZE {
 			line := csvInput.ReadRecord()
+			//fmt.Println(line)
 			if line != nil {
 				buff.WriteString(strings.Join(line, ",") + "\n")
+			} else {
+				isLast = true
+				break
 			}
 		}
-		fmt.Println(buff.Len())
-		go sendLine(i, buff, done)
+
+		queue <- Batch{idx: i, data: buff}
+
+		if isLast {
+			log.Println("Last batch sent", i)
+			close(queue)
+			break
+		}
+
 	}
 	<-done
 
@@ -171,9 +190,14 @@ func RunBatch(
 
 }
 
-func sendLine(step int, buff *bytes.Buffer, done chan bool) {
-	println(step)
-	_, body := sendScoringBatch(false, buff)
-	fmt.Println(string(body))
+func sendLine(workerIdx int, batches <-chan Batch) {
+	log.Println("Spawned worker", workerIdx)
+
+	for batch := range batches {
+		fmt.Println(batch.idx)
+		time.Sleep(time.Second * 3)
+	}
+	//_, body := sendScoringBatch(false, buff)
+	//fmt.Println(string(body))
 
 }
