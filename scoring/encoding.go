@@ -1,20 +1,19 @@
 package scoring
 
 import (
-	"os"
-	"log"
-	"strings"
 	"compress/gzip"
 	"github.com/saintfish/chardet"
-
+	"log"
+	"os"
+	"strings"
 )
 
 const (
-	DETECT_SAMPLE_SIZE_FAST int = 209715  // int(0.2 * 1024 ^ 2)
+	DETECT_SAMPLE_SIZE_FAST int = 209715 // int(0.2 * 1024 ^ 2)
 	DETECT_SAMPLE_SIZE_SLOW int = 1024 * 1024
-	AUTO_SAMPLE_SIZE int = 524288  // int(0.5 * 1024 ^ 2)
-	AUTO_SMALL_SAMPLES int = 500
-	AUTO_GOAL_SIZE int = 2621440  // int(2.5 * 1024 ^ 2) size we want per batch
+	AUTO_SAMPLE_SIZE        int = 524288 // int(0.5 * 1024 ^ 2)
+	AUTO_SMALL_SAMPLES      int = 500
+	AUTO_GOAL_SIZE          int = 2621440 // int(2.5 * 1024 ^ 2) size we want per batch
 )
 
 func investigateEncoding(dataset, encoding, inDelimiter, outDelimiter string) string {

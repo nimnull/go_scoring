@@ -1,8 +1,8 @@
 package scoring
 
 import (
-	"net/http"
 	"net"
+	"net/http"
 	"time"
 )
 
@@ -16,7 +16,7 @@ var netTransport = &http.Transport{
 func GetHttpClient() *http.Client {
 
 	var netClient = &http.Client{
-		Timeout: time.Second * 10,
+		Timeout:   time.Second * 10,
 		Transport: netTransport,
 	}
 	return netClient

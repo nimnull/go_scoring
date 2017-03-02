@@ -16,7 +16,7 @@ func ValidateHost(host string) *url.URL {
 		log.Fatalf("`%s` is not valid host URL\n", host)
 	} else {
 		//hostUrl.Path = "/api/v1"
-		hostUrl.Path = "/v1"
+		hostUrl.Path = "/v1.0"
 	}
 	return hostUrl
 }

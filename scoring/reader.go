@@ -1,8 +1,8 @@
 package scoring
 
 import (
-	"io"
 	"encoding/csv"
+	"io"
 	"log"
 	"os"
 	"path"

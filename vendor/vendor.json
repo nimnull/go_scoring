@@ -9,16 +9,52 @@
 			"revisionTime": "2017-02-15T08:18:16Z"
 		},
 		{
-			"checksumSHA1": "F4UatuL6NDnCZQYnct3WZhpTsGQ=",
-			"path": "github.com/csimplestring/go-csv/detector",
-			"revision": "cb5bfc42336228e618075c3005a4b0979657861c",
-			"revisionTime": "2017-01-14T20:53:35Z"
-		},
-		{
 			"checksumSHA1": "hveFTNQ9YEyYRs6SWuXM+XU9qRI=",
 			"path": "github.com/fsnotify/fsnotify",
 			"revision": "fd9ec7deca8bf46ecd2a795baaacf2b3a9be1197",
 			"revisionTime": "2016-10-26T20:31:22Z"
+		},
+		{
+			"checksumSHA1": "3VgM7+9j8VUz/khFED41HCCDyKA=",
+			"path": "github.com/golang/leveldb",
+			"revision": "259d9253d71996b7778a3efb4144fe4892342b18",
+			"revisionTime": "2017-01-07T01:01:02Z"
+		},
+		{
+			"checksumSHA1": "QmBNcR8bwcyIlYHV0feN1CZwbnQ=",
+			"path": "github.com/golang/leveldb/crc",
+			"revision": "259d9253d71996b7778a3efb4144fe4892342b18",
+			"revisionTime": "2017-01-07T01:01:02Z"
+		},
+		{
+			"checksumSHA1": "zAIyI69K4l7Wi1EwqRA7XkZ4k8I=",
+			"path": "github.com/golang/leveldb/db",
+			"revision": "259d9253d71996b7778a3efb4144fe4892342b18",
+			"revisionTime": "2017-01-07T01:01:02Z"
+		},
+		{
+			"checksumSHA1": "W833YFytgpRBbAfISV8SAAWhbUA=",
+			"path": "github.com/golang/leveldb/memdb",
+			"revision": "259d9253d71996b7778a3efb4144fe4892342b18",
+			"revisionTime": "2017-01-07T01:01:02Z"
+		},
+		{
+			"checksumSHA1": "Nk6Q9c7QqPqx+t+9fqucU5OcJtc=",
+			"path": "github.com/golang/leveldb/record",
+			"revision": "259d9253d71996b7778a3efb4144fe4892342b18",
+			"revisionTime": "2017-01-07T01:01:02Z"
+		},
+		{
+			"checksumSHA1": "Wu/Lun+YzGuKZBYg7LnjX1afyGo=",
+			"path": "github.com/golang/leveldb/table",
+			"revision": "259d9253d71996b7778a3efb4144fe4892342b18",
+			"revisionTime": "2017-01-07T01:01:02Z"
+		},
+		{
+			"checksumSHA1": "p/8vSviYF91gFflhrt5vkyksroo=",
+			"path": "github.com/golang/snappy",
+			"revision": "553a641470496b2327abcac10b36396bd98e45c9",
+			"revisionTime": "2017-02-15T23:32:05Z"
 		},
 		{
 			"checksumSHA1": "Ok3Csn6Voou7pQT6Dv2mkwpqFtw=",
@@ -93,12 +129,6 @@
 			"revisionTime": "2017-01-18T00:13:03Z"
 		},
 		{
-			"checksumSHA1": "CxNwJP++vjUAyy3bbJnNss1Il9Q=",
-			"path": "github.com/moul/http2curl",
-			"revision": "4e24498b31dba4683efb9d35c1c8a91e2eda28c8",
-			"revisionTime": "2016-10-31T19:45:48Z"
-		},
-		{
 			"checksumSHA1": "8Y05Pz7onrQPcVWW6JStSsYRh6E=",
 			"path": "github.com/pelletier/go-buffruneio",
 			"revision": "df1e16fde7fc330a0ca68167c23bf7ed6ac31d6d",
@@ -157,18 +187,6 @@
 			"path": "github.com/spf13/viper",
 			"revision": "5ed0fc31f7f453625df314d8e66b9791e8d13003",
 			"revisionTime": "2016-12-13T09:38:49Z"
-		},
-		{
-			"checksumSHA1": "GIGmSrYACByf5JDIP9ByBZksY80=",
-			"path": "golang.org/x/net/idna",
-			"revision": "b4690f45fa1cafc47b1c280c2e75116efe40cc13",
-			"revisionTime": "2017-02-15T08:41:58Z"
-		},
-		{
-			"checksumSHA1": "kEO69MIsqWDxBOIs3ez1faofNSg=",
-			"path": "golang.org/x/net/publicsuffix",
-			"revision": "b4690f45fa1cafc47b1c280c2e75116efe40cc13",
-			"revisionTime": "2017-02-15T08:41:58Z"
 		},
 		{
 			"checksumSHA1": "uTQtOqR0ePMMcvuvAIksiIZxhqU=",

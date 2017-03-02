@@ -21,8 +21,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
-	"go_scoring/validate"
 	"go_scoring/scoring"
+	"go_scoring/validate"
 )
 
 var hostURL *url.URL
@@ -31,7 +31,7 @@ var hostURL *url.URL
 var standaloneCmd = &cobra.Command{
 	Use:   "standalone",
 	Short: "Scoring over standalone prediction instances",
-	Long: `Use: go_scoring standalone [flags] <import_id> <dataset path>`,
+	Long:  `Use: go_scoring standalone [flags] <import_id> <dataset path>`,
 	PreRun: func(cmd *cobra.Command, args []string) {
 		hostURL = validate.ValidateHost(
 			viper.GetString("host"))
