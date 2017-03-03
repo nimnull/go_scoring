@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	sampleLines             = 30
+	sampleLines             = 21
 	nonDelimiterRegexString = `[[:alnum:]\n\r]`
 )
 
@@ -32,13 +32,11 @@ type detector struct {
 // DetectDelimiter finds a slice of delimiter string.
 func (d *detector) DetectDelimiter(reader io.Reader, enclosure byte) []string {
 	statistics, totalLines := d.sample(reader, sampleLines, enclosure)
-
 	var candidates []string
 
 	for _, delimiter := range d.analyze(statistics, totalLines) {
 		candidates = append(candidates, string(delimiter))
 	}
-
 	return candidates
 }
 
@@ -87,6 +85,7 @@ func (d *detector) sample(reader io.Reader, sampleLines int, enclosure byte) (fr
 				if actualSampleLines >= sampleLines {
 					break
 				}
+
 			} else if !enclosed {
 				if !d.nonDelimiterRegex.MatchString(string(current)) {
 					frequencies.increment(current, actualSampleLines)
@@ -108,10 +107,10 @@ func (d *detector) sample(reader io.Reader, sampleLines int, enclosure byte) (fr
 func (d *detector) analyze(ft frequencyTable, sampleLine int) []byte {
 	mean := func(frequencyOfLine map[int]int, size int) float32 {
 		total := 0
-		for _, frequency := range frequencyOfLine {
-			total += frequency
+		for i := 1; i < size; i++ {
+			total += frequencyOfLine[i]
 		}
-		return float32(total) / float32(len(frequencyOfLine))
+		return float32(total) / float32(size - 1)
 	}
 
 	deviation := func(frequencyOfLine map[int]int, size int) float64 {
@@ -128,7 +127,7 @@ func (d *detector) analyze(ft frequencyTable, sampleLine int) []byte {
 			d := (average - frequency) * (average - frequency)
 			total += math.Sqrt(float64(d))
 		}
-		return total / float64(size)
+		return total / float64(size - 1)
 	}
 
 	var candidates []byte

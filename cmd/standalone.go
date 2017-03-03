@@ -48,7 +48,7 @@ var standaloneCmd = &cobra.Command{
 			hostURL, importId, dataset,
 			viper.GetString("encoding"),
 			viper.GetString("delimiter"),
-			0, 0, false, false)
+			0, 2, false, false)
 	},
 }
 

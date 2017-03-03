@@ -57,6 +57,12 @@
 			"revisionTime": "2017-02-15T23:32:05Z"
 		},
 		{
+			"checksumSHA1": "mBcZD7rFxscuSxsmrdrFXvQ2wGM=",
+			"path": "github.com/google/leveldb",
+			"revision": "a53934a3ae1244679f812d998a4f16f2c7f309a6",
+			"revisionTime": "2017-03-01T23:14:49Z"
+		},
+		{
 			"checksumSHA1": "Ok3Csn6Voou7pQT6Dv2mkwpqFtw=",
 			"path": "github.com/hashicorp/hcl",
 			"revision": "eb6f65b2d77ed5078887f960ff570fbddbbeb49d",

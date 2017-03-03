@@ -1,9 +1,9 @@
 package validate
 
 import (
+	"log"
 	"net/url"
 	"os"
-	"log"
 )
 
 func ValidateHost(host string) *url.URL {

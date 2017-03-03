@@ -1,8 +1,8 @@
 package main
 
 import (
-	"go_scoring/cmd"
 	"fmt"
+	"go_scoring/cmd"
 	"os"
 )
 
