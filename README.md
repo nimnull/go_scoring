@@ -21,7 +21,7 @@ Use: go_scoring standalone [flags] <import_id> <dataset path>
 
 Currently supports only `standalone` subcommand with following flags:
 
-- `--host`: specifies host to request for predictions in format <proto>//:<ip|fqdn>[:port].
+- `--host`: specifies host to request for predictions in format `<proto>//:<ip|fqdn>[:port]`.
 
 
 Arguments:
