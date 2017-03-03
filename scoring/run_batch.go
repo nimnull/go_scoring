@@ -24,7 +24,7 @@ type Batch struct {
 }
 
 const (
-	MAX_BATCH_SIZE = 2*(1024 ^ 2)
+	MAX_BATCH_SIZE = 2 * (1024 ^ 2)
 	CLIENT_HEADERS = "datarobot_batch_scoring/%s|Golang/%s|system/%s"
 )
 
@@ -207,7 +207,24 @@ func sendLine(idx int, queue <-chan Batch, db *leveldb.DB, finisher chan bool) {
 	for batch := range queue {
 		fmt.Println("Got batch:", batch.idx)
 		statusCode, body := sendScoringBatch(false, batch.data)
-		fmt.Println(statusCode, string(body))
+		fmt.Println(statusCode)
+		if statusCode == 200 {
+			err := db.Set([]byte(fmt.Sprintf("batch_%d", batch.idx)),
+				batch.data.Bytes(), nil)
+			check(err, fmt.Sprintf("Failed to store batch: %d", batch.idx))
+			err = db.Set([]byte(fmt.Sprintf("pred_%d", batch.idx)),
+				body, nil)
+			check(err, fmt.Sprintf("Failed to store batch %d results", batch.idx))
+		} else {
+			failed, err := db.Get([]byte("failed"), nil)
+			fmt.Println(string(failed))
+			check(err, "Failed to get batchlist")
+			err = db.Set([]byte("failed"), body, nil)
+			check(err, "Failed to set batch result")
+		}
+
+
+
 		//processStatusCodes(statusCode, body)
 	}
 }
