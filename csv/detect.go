@@ -110,7 +110,7 @@ func (d *detector) analyze(ft frequencyTable, sampleLine int) []byte {
 		for i := 1; i < size; i++ {
 			total += frequencyOfLine[i]
 		}
-		return float32(total) / float32(size - 1)
+		return float32(total) / float32(size-1)
 	}
 
 	deviation := func(frequencyOfLine map[int]int, size int) float64 {
@@ -127,7 +127,7 @@ func (d *detector) analyze(ft frequencyTable, sampleLine int) []byte {
 			d := (average - frequency) * (average - frequency)
 			total += math.Sqrt(float64(d))
 		}
-		return total / float64(size - 1)
+		return total / float64(size-1)
 	}
 
 	var candidates []byte

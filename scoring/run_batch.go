@@ -14,12 +14,13 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"time"
 	"unicode/utf8"
 )
 
 type Batch struct {
 	idx    int
-	buffer *bytes.Buffer
+	data   *bytes.Buffer
 	isLast bool
 }
 
@@ -52,7 +53,7 @@ func getCSVInput(file *os.File) *csvtools.CSVInput {
 	delimiters := dt.DetectDelimiter(file, '"')
 
 	r, _ := utf8.DecodeRuneInString(delimiters[0])
-	// rewind file after detector finish work
+	// rewind file after detector finished it's work
 	file.Seek(0, 0)
 	opts := csvtools.CSVInputOptions{true, r, file}
 	csvInput, err := csvtools.NewCSVInput(&opts)
@@ -126,7 +127,8 @@ func RunBatch(
 
 	csvHeader := csvInput.Header()
 	buff := bytes.NewBufferString(strings.Join(csvHeader, ",") + "\n")
-	buff.WriteString(strings.Join(csvInput.ReadRecord(), ",") + "\n")
+	firstRow := csvInput.ReadRecord()
+	buff.WriteString(strings.Join(firstRow, ",") + "\n")
 
 	statusCode, body := sendScoringBatch(false, buff)
 	processStatusCodes(statusCode, body)
@@ -137,39 +139,41 @@ func RunBatch(
 		fmt.Printf("Execution time: %d\n", execTime)
 	}
 
-	batches := make(chan Batch, 100)
+	queue := make(chan Batch, 100)
 	finisher := make(chan bool, 1)
 
 	db, err := leveldb.Open("./shelve", nil)
 	check(err, "DB Error:")
 
 	for j := 0; j < concurrent; j++ {
-		go sendLine(j, batches, db, finisher)
+		go sendLine(j, queue, db, finisher)
 	}
 
-	for i := 0 ;; i++ {
+	for i := 0; ; i++ {
 		buff := bytes.NewBufferString(strings.Join(csvHeader, ",") + "\n")
 		isLast := false
 
 		for buff.Len() < MAX_BATCH_SIZE {
 			line := csvInput.ReadRecord()
-			fmt.Println(line)
-			buff.WriteString(strings.Join(line, ",") + "\n")
-			//if line != nil {
-			//	buff.WriteString(strings.Join(line, ",") + "\n")
-			//} else {
-			//	isLast = true
-			//}
+			//fmt.Println(line)
+			if line != nil {
+				buff.WriteString(strings.Join(line, ",") + "\n")
+			} else {
+				isLast = true
+				break
+			}
 		}
-		batches <- Batch{idx: i, buffer: buff, isLast: isLast}
-		//p := make([]byte, buff.Len())
-		//buff.Read(p)
-		//fmt.Println(string(p))
+		queue <- Batch{idx: i, data: buff, isLast: isLast}
+
+		if isLast {
+			log.Println("Last batch sent", i)
+			close(queue)
+			break
+		}
 
 	}
 
 	<-finisher
-
 
 	//fmt.Printf("Resp: %#v\n", string(body))
 
@@ -185,17 +189,11 @@ func RunBatch(
 
 }
 
-func sendLine(idx int, batches <-chan Batch, db *leveldb.DB, finisher chan bool) {
+func sendLine(idx int, queue <-chan Batch, db *leveldb.DB, finisher chan bool) {
 	fmt.Println("Spawned worker", idx)
-	for batch := range batches {
+	for batch := range queue {
 		fmt.Println("Got batch:", batch.idx)
-		statusCode, body := sendScoringBatch(false, batch.buffer)
+		statusCode, body := sendScoringBatch(false, batch.data)
 		processStatusCodes(statusCode, body)
-
-		if batch.isLast {
-			fmt.Println("Got last")
-			finisher <- true
-			break
-		}
 	}
 }

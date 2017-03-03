@@ -21,3 +21,12 @@ func GetHttpClient() *http.Client {
 	}
 	return netClient
 }
+
+func All(batches map[int]string, f func(string) bool) bool {
+	for _, val := range batches {
+		if !f(val) {
+			return false
+		}
+	}
+	return true
+}
