@@ -14,7 +14,6 @@ import (
 	"os"
 	"runtime"
 	"strings"
-	"time"
 	"unicode/utf8"
 )
 
@@ -25,7 +24,7 @@ type Batch struct {
 }
 
 const (
-	MAX_BATCH_SIZE = 5*1024 ^ 2
+	MAX_BATCH_SIZE = 2*(1024 ^ 2)
 	CLIENT_HEADERS = "datarobot_batch_scoring/%s|Golang/%s|system/%s"
 )
 
@@ -48,7 +47,7 @@ func check(e error, msg string) {
 	}
 }
 
-func getCSVInput(file *os.File) *csvtools.CSVInput {
+func getCSVInput(file *os.File) (*csvtools.CSVInput, string) {
 	dt := csvtools.NewDetector()
 	delimiters := dt.DetectDelimiter(file, '"')
 
@@ -59,7 +58,7 @@ func getCSVInput(file *os.File) *csvtools.CSVInput {
 	csvInput, err := csvtools.NewCSVInput(&opts)
 	check(err, "Failed to initialize csv reader")
 
-	return csvInput
+	return csvInput, delimiters[0]
 }
 
 func sendScoringBatch(compression bool, data io.Reader) (int, []byte) {
@@ -70,9 +69,14 @@ func sendScoringBatch(compression bool, data io.Reader) (int, []byte) {
 	}
 	netClient := GetHttpClient()
 	resp, err := netClient.Do(req)
-	check(err, fmt.Sprintf("Failed to send request %s", data))
-	defer resp.Body.Close()
+	for err != nil {
+		req, err := http.NewRequest("POST", scoringEndpoint, data)
+		log.Printf("Failed to send request %s. %s\n", data, err)
+		netClient := GetHttpClient()
+		resp, err = netClient.Do(req)
+	}
 
+	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	check(err, "Failed to read response")
 
@@ -123,7 +127,7 @@ func RunBatch(
 	file, err := os.Open(dataset)
 	check(err, "Failed to open predict source")
 	defer file.Close()
-	csvInput := getCSVInput(file)
+	csvInput, delimiter := getCSVInput(file)
 
 	csvHeader := csvInput.Header()
 	buff := bytes.NewBufferString(strings.Join(csvHeader, ",") + "\n")
@@ -157,12 +161,21 @@ func RunBatch(
 			line := csvInput.ReadRecord()
 			//fmt.Println(line)
 			if line != nil {
-				buff.WriteString(strings.Join(line, ",") + "\n")
+				var escapedLine []string
+				for _, record := range line {
+					if strings.Contains(record, delimiter) {
+						escapedLine = append(escapedLine, fmt.Sprintf("\"%s\"", record))
+					} else {
+						escapedLine = append(escapedLine, record)
+					}
+				}
+				buff.WriteString(strings.Join(escapedLine, ",") + "\n")
 			} else {
 				isLast = true
 				break
 			}
 		}
+
 		queue <- Batch{idx: i, data: buff, isLast: isLast}
 
 		if isLast {
@@ -194,6 +207,7 @@ func sendLine(idx int, queue <-chan Batch, db *leveldb.DB, finisher chan bool) {
 	for batch := range queue {
 		fmt.Println("Got batch:", batch.idx)
 		statusCode, body := sendScoringBatch(false, batch.data)
-		processStatusCodes(statusCode, body)
+		fmt.Println(statusCode, string(body))
+		//processStatusCodes(statusCode, body)
 	}
 }

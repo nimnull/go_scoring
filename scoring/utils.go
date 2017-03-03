@@ -6,20 +6,21 @@ import (
 	"time"
 )
 
-var netTransport = &http.Transport{
-	Dial: (&net.Dialer{
+var transport = &http.Transport{
+	DialContext: (&net.Dialer{
 		Timeout: 5 * time.Second,
-	}).Dial,
+		KeepAlive: 15 * time.Second,
+	}).DialContext,
 	TLSHandshakeTimeout: 5 * time.Second,
 }
 
-func GetHttpClient() *http.Client {
 
-	var netClient = &http.Client{
+func GetHttpClient() *http.Client {
+	transport.DisableKeepAlives = true
+	return &http.Client{
 		Timeout:   time.Second * 10,
-		Transport: netTransport,
+		Transport: transport,
 	}
-	return netClient
 }
 
 func All(batches map[int]string, f func(string) bool) bool {
