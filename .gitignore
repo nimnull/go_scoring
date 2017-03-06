@@ -1,6 +1,7 @@
 *.csv
 go_scoring
 vendor/*
+shelve
 .idea
 
 # Compiled Object files, Static and Dynamic libs (Shared Objects)

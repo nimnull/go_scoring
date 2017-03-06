@@ -28,7 +28,10 @@ const (
 	CLIENT_HEADERS = "datarobot_batch_scoring/%s|Golang/%s|system/%s"
 )
 
-var scoringEndpoint string
+var (
+	scoringEndpoint string
+	totalBatches int
+)
 
 func getHttpHeaders(compression bool) map[string]string {
 	headers := make(map[string]string)
@@ -61,7 +64,7 @@ func getCSVInput(file *os.File) (*csvtools.CSVInput, string) {
 	return csvInput, delimiters[0]
 }
 
-func sendScoringBatch(compression bool, data io.Reader) (int, []byte) {
+func requestScoring(compression bool, data io.Reader) (int, []byte) {
 	req, err := http.NewRequest("POST", scoringEndpoint, data)
 	check(err, "Failed to prepare request")
 	for k, v := range getHttpHeaders(compression) {
@@ -82,6 +85,8 @@ func sendScoringBatch(compression bool, data io.Reader) (int, []byte) {
 
 	return resp.StatusCode, body
 }
+
+
 
 func processStatusCodes(statusCode int, respBody []byte) {
 	switch statusCode {
@@ -134,7 +139,7 @@ func RunBatch(
 	firstRow := csvInput.ReadRecord()
 	buff.WriteString(strings.Join(firstRow, ",") + "\n")
 
-	statusCode, body := sendScoringBatch(false, buff)
+	statusCode, body := requestScoring(false, buff)
 	processStatusCodes(statusCode, body)
 
 	if execTime, err := jsonparser.GetInt(body, "execution_time"); err != nil {
@@ -145,12 +150,13 @@ func RunBatch(
 
 	queue := make(chan Batch, 100)
 	finisher := make(chan bool, 1)
-
-	db, err := leveldb.Open("./shelve", nil)
+	// init storage handler
+	db, err = leveldb.Open("./shelve", nil)
 	check(err, "DB Error:")
+	defer db.Close()
 
 	for j := 0; j < concurrent; j++ {
-		go sendLine(j, queue, db, finisher)
+		go batchSender(j, queue, finisher)
 	}
 
 	for i := 0; ; i++ {
@@ -181,6 +187,7 @@ func RunBatch(
 		if isLast {
 			log.Println("Last batch sent", i)
 			close(queue)
+			totalBatches = i
 			break
 		}
 
@@ -202,19 +209,14 @@ func RunBatch(
 
 }
 
-func sendLine(idx int, queue <-chan Batch, db *leveldb.DB, finisher chan bool) {
+func batchSender(idx int, queue <-chan Batch, finisher chan bool) {
 	fmt.Println("Spawned worker", idx)
 	for batch := range queue {
 		fmt.Println("Got batch:", batch.idx)
-		statusCode, body := sendScoringBatch(false, batch.data)
+		statusCode, body := requestScoring(false, batch.data)
 		fmt.Println(statusCode)
 		if statusCode == 200 {
-			err := db.Set([]byte(fmt.Sprintf("batch_%d", batch.idx)),
-				batch.data.Bytes(), nil)
-			check(err, fmt.Sprintf("Failed to store batch: %d", batch.idx))
-			err = db.Set([]byte(fmt.Sprintf("pred_%d", batch.idx)),
-				body, nil)
-			check(err, fmt.Sprintf("Failed to store batch %d results", batch.idx))
+			storeBatchPred(batch.idx, batch.data.Bytes(), body)
 		} else {
 			failed, err := db.Get([]byte("failed"), nil)
 			fmt.Println(string(failed))
@@ -222,9 +224,6 @@ func sendLine(idx int, queue <-chan Batch, db *leveldb.DB, finisher chan bool) {
 			err = db.Set([]byte("failed"), body, nil)
 			check(err, "Failed to set batch result")
 		}
-
-
-
 		//processStatusCodes(statusCode, body)
 	}
 }
