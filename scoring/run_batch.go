@@ -2,8 +2,8 @@ package scoring
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
-	"go_scoring/csv"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -15,20 +15,23 @@ import (
 
 	"github.com/buger/jsonparser"
 	"github.com/golang/leveldb"
+
+	"go_scoring/csv"
 )
 
 type Batch struct {
-	Idx    int		`json:"id"`
-	Data   []byte	`json:"data"`
-	Result []byte	`json:"result,omitempty"`
-	isLast bool		`json:"-"`
+	Idx    int    `json:"id"`
+	Data   []byte `json:"data"`
+	Result []byte `json:"result,omitempty"`
+	isLast bool   `json:"-"`
 }
 
 const (
-	MAX_BATCH_SIZE = 2 * (1024 ^ 2)
-	CLIENT_HEADERS = "datarobot_batch_scoring/%s|Golang/%s|system/%s"
-	BATCH_COUNTER  = "batches_cnt"
-	SHELVE_PATH = "./shelve"
+	MAX_BATCH_SIZE  = 2 * (1024 ^ 2)
+	CLIENT_HEADERS  = "datarobot_batch_scoring/%s|Golang/%s|system/%s"
+	BATCH_COUNTER   = "batches_cnt"
+	FAILED_LIST_KEY = "failed"
+	SHELVE_PATH     = "./shelve"
 )
 
 var (
@@ -161,9 +164,11 @@ func RunBatch(
 		go batchSender(j, queue, finisher)
 	}
 
-	for i := 0 ;; i++ {
-		buff := bytes.NewBufferString(strings.Join(csvHeader, ",") + "\n")
+	for i := 0; ; i++ {
 		isLast := false
+		totalBatches = i
+
+		buff := bytes.NewBufferString(strings.Join(csvHeader, ",") + "\n")
 
 		for buff.Len() < MAX_BATCH_SIZE {
 			line := csvInput.ReadRecord()
@@ -189,13 +194,21 @@ func RunBatch(
 		if isLast {
 			log.Println("Last batch sent", i)
 			close(queue)
-			totalBatches = i
 			break
 		}
 
 	}
 
 	<-finisher
+
+	var failedListParsed []int
+	failedList, err := storage.Get([]byte("failed"), nil)
+	err = json.Unmarshal(failedList, failedListParsed)
+	fmt.Printf("Failed batches: %#v\n", len(failedList))
+
+	if len(failedList) {
+
+	}
 
 	fmt.Println("results assembling goes here")
 
@@ -226,7 +239,6 @@ func batchSender(idx int, queue <-chan Batch, finisher chan bool) {
 
 		counter, err := incrementCounter(BATCH_COUNTER)
 		check(err, "Failed to increment counter")
-		fmt.Println(counter)
 		if counter == uint64(totalBatches) {
 			finisher <- true
 		}
