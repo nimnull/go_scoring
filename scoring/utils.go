@@ -8,12 +8,11 @@ import (
 
 var transport = &http.Transport{
 	DialContext: (&net.Dialer{
-		Timeout: 5 * time.Second,
+		Timeout:   5 * time.Second,
 		KeepAlive: 15 * time.Second,
 	}).DialContext,
 	TLSHandshakeTimeout: 5 * time.Second,
 }
-
 
 func GetHttpClient() *http.Client {
 	transport.DisableKeepAlives = true

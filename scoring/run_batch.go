@@ -3,10 +3,7 @@ package scoring
 import (
 	"bytes"
 	"fmt"
-	"github.com/buger/jsonparser"
-	"github.com/golang/leveldb"
 	"go_scoring/csv"
-	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -15,22 +12,28 @@ import (
 	"runtime"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/buger/jsonparser"
+	"github.com/golang/leveldb"
 )
 
 type Batch struct {
-	idx    int
-	data   *bytes.Buffer
-	isLast bool
+	Idx    int		`json:"id"`
+	Data   []byte	`json:"data"`
+	Result []byte	`json:"result,omitempty"`
+	isLast bool		`json:"-"`
 }
 
 const (
 	MAX_BATCH_SIZE = 2 * (1024 ^ 2)
 	CLIENT_HEADERS = "datarobot_batch_scoring/%s|Golang/%s|system/%s"
+	BATCH_COUNTER  = "batches_cnt"
+	SHELVE_PATH = "./shelve"
 )
 
 var (
-	scoringEndpoint string
-	totalBatches int
+	predictionEndpoint string
+	totalBatches       int
 )
 
 func getHttpHeaders(compression bool) map[string]string {
@@ -64,8 +67,8 @@ func getCSVInput(file *os.File) (*csvtools.CSVInput, string) {
 	return csvInput, delimiters[0]
 }
 
-func requestScoring(compression bool, data io.Reader) (int, []byte) {
-	req, err := http.NewRequest("POST", scoringEndpoint, data)
+func requestScoring(compression bool, data []byte) (int, []byte) {
+	req, err := http.NewRequest("POST", predictionEndpoint, bytes.NewReader(data))
 	check(err, "Failed to prepare request")
 	for k, v := range getHttpHeaders(compression) {
 		req.Header.Set(k, v)
@@ -73,7 +76,7 @@ func requestScoring(compression bool, data io.Reader) (int, []byte) {
 	netClient := GetHttpClient()
 	resp, err := netClient.Do(req)
 	for err != nil {
-		req, err := http.NewRequest("POST", scoringEndpoint, data)
+		req, err := http.NewRequest("POST", predictionEndpoint, bytes.NewReader(data))
 		log.Printf("Failed to send request %s. %s\n", data, err)
 		netClient := GetHttpClient()
 		resp, err = netClient.Do(req)
@@ -85,8 +88,6 @@ func requestScoring(compression bool, data io.Reader) (int, []byte) {
 
 	return resp.StatusCode, body
 }
-
-
 
 func processStatusCodes(statusCode int, respBody []byte) {
 	switch statusCode {
@@ -126,7 +127,7 @@ func RunBatch(
 	}
 
 	baseUrl.Path = fmt.Sprintf("%s/%s/predict", baseUrl.Path, importId)
-	scoringEndpoint = baseUrl.String()
+	predictionEndpoint = baseUrl.String()
 	encoding = investigateEncoding(dataset, encoding, delimiter, delimiter)
 
 	file, err := os.Open(dataset)
@@ -139,7 +140,7 @@ func RunBatch(
 	firstRow := csvInput.ReadRecord()
 	buff.WriteString(strings.Join(firstRow, ",") + "\n")
 
-	statusCode, body := requestScoring(false, buff)
+	statusCode, body := requestScoring(false, buff.Bytes())
 	processStatusCodes(statusCode, body)
 
 	if execTime, err := jsonparser.GetInt(body, "execution_time"); err != nil {
@@ -151,21 +152,22 @@ func RunBatch(
 	queue := make(chan Batch, 100)
 	finisher := make(chan bool, 1)
 	// init storage handler
-	db, err = leveldb.Open("./shelve", nil)
+	storage, err = leveldb.Open(SHELVE_PATH, nil)
 	check(err, "DB Error:")
-	defer db.Close()
+	defer storage.Close()
+	defer os.Remove(SHELVE_PATH)
 
 	for j := 0; j < concurrent; j++ {
 		go batchSender(j, queue, finisher)
 	}
 
-	for i := 0; ; i++ {
+	for i := 0 ;; i++ {
 		buff := bytes.NewBufferString(strings.Join(csvHeader, ",") + "\n")
 		isLast := false
 
 		for buff.Len() < MAX_BATCH_SIZE {
 			line := csvInput.ReadRecord()
-			//fmt.Println(line)
+
 			if line != nil {
 				var escapedLine []string
 				for _, record := range line {
@@ -182,7 +184,7 @@ func RunBatch(
 			}
 		}
 
-		queue <- Batch{idx: i, data: buff, isLast: isLast}
+		queue <- Batch{Idx: i, Data: buff.Bytes(), isLast: isLast}
 
 		if isLast {
 			log.Println("Last batch sent", i)
@@ -194,6 +196,8 @@ func RunBatch(
 	}
 
 	<-finisher
+
+	fmt.Println("results assembling goes here")
 
 	//fmt.Printf("Resp: %#v\n", string(body))
 
@@ -212,18 +216,21 @@ func RunBatch(
 func batchSender(idx int, queue <-chan Batch, finisher chan bool) {
 	fmt.Println("Spawned worker", idx)
 	for batch := range queue {
-		fmt.Println("Got batch:", batch.idx)
-		statusCode, body := requestScoring(false, batch.data)
-		fmt.Println(statusCode)
+		statusCode, body := requestScoring(false, batch.Data)
 		if statusCode == 200 {
-			storeBatchPred(batch.idx, batch.data.Bytes(), body)
+			batch.Result = body
+			storeFinishedBatch(&batch)
 		} else {
-			failed, err := db.Get([]byte("failed"), nil)
-			fmt.Println(string(failed))
-			check(err, "Failed to get batchlist")
-			err = db.Set([]byte("failed"), body, nil)
-			check(err, "Failed to set batch result")
+			storeFailedBatch(&batch)
 		}
+
+		counter, err := incrementCounter(BATCH_COUNTER)
+		check(err, "Failed to increment counter")
+		fmt.Println(counter)
+		if counter == uint64(totalBatches) {
+			finisher <- true
+		}
+
 		//processStatusCodes(statusCode, body)
 	}
 }
