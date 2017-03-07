@@ -12,6 +12,7 @@ import (
 var (
 	storage *leveldb.DB
 	cntMux  sync.Mutex
+	listMux sync.Mutex
 )
 
 func incrementCounter(key string) (uint64, error) {
@@ -44,31 +45,40 @@ func getCounter(key string) (uint64, error) {
 	}
 }
 
-func storeFinishedBatch(batch *Batch) {
-	sourceKey := fmt.Sprintf("finished_%d", batch.Idx)
-	sourceVal, err := json.Marshal(batch)
+func storeBatchResult(batch *Batch, listKey, recordTpl string) {
+	recordKey := fmt.Sprintf(recordTpl, batch.Idx)
+	recordVal, err := json.Marshal(batch)
 
-	err = storage.Set([]byte(sourceKey), sourceVal, nil)
-	check(err, fmt.Sprintf("Failed to store batch: %d", string(sourceVal)))
+	err = storage.Set([]byte(recordKey), recordVal, nil)
+	check(err, fmt.Sprintf("Failed to store batch %d", batch.Idx))
+
+	storeBatchList(listKey, batch.Idx)
 }
 
-func storeFailedBatch(batch *Batch) {
-	var failedListParsed []int
-	failedKey := fmt.Sprintf("failed_%d", batch.Idx)
-	listKey := []byte(FAILED_LIST_KEY)
-	failedVal, err := json.Marshal(batch)
 
-	err = storage.Set([]byte(failedKey), failedVal, nil)
-	check(err, fmt.Sprintf("Failed to store batch %d result", batch.Idx))
+func storeBatchList(listName string, batchId int) error {
+	listMux.Lock()
+	defer listMux.Unlock()
 
-	failedList, err := storage.Get(listKey, nil)
-
-	err = json.Unmarshal(failedList, failedListParsed)
+	var parsedList []int
+	listKey := []byte(listName)
+	storedList, err := storage.Get(listKey, nil)
 	if err != nil {
-		failedListParsed = []int{}
+		parsedList = make([]int, 0)
+	} else {
+		err = json.Unmarshal(storedList, parsedList)
+		return err
 	}
-	failedList, err = json.Marshal(failedListParsed)
-	fmt.Printf("Failed batches: %#v\n", failedList)
-	storage.Set(listKey, failedList, nil)
 
+	storedLen := len(parsedList)
+	parsedList = make([]int, len(parsedList) + 1)
+	parsedList[storedLen] = batchId
+
+	storedList, err = json.Marshal(parsedList)
+	if err != nil {
+		return err
+	}
+	storage.Set(listKey, storedList, nil)
+
+	return nil
 }

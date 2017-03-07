@@ -27,11 +27,12 @@ type Batch struct {
 }
 
 const (
-	MAX_BATCH_SIZE  = 2 * (1024 ^ 2)
-	CLIENT_HEADERS  = "datarobot_batch_scoring/%s|Golang/%s|system/%s"
-	BATCH_COUNTER   = "batches_cnt"
-	FAILED_LIST_KEY = "failed"
-	SHELVE_PATH     = "./shelve"
+	MAX_BATCH_SIZE   = 2 * (1024 ^ 2)
+	CLIENT_HEADERS   = "datarobot_batch_scoring/%s|Golang/%s|system/%s"
+	BATCH_COUNTER    = "batches_cnt"
+	FAILED_LIST_KEY  = "failed"
+	SUCCEED_LIST_KEY = "succeed"
+	SHELVE_PATH      = "./shelve"
 )
 
 var (
@@ -157,8 +158,9 @@ func RunBatch(
 	// init storage handler
 	storage, err = leveldb.Open(SHELVE_PATH, nil)
 	check(err, "DB Error:")
-	defer storage.Close()
+
 	defer os.Remove(SHELVE_PATH)
+	defer storage.Close()
 
 	for j := 0; j < concurrent; j++ {
 		go batchSender(j, queue, finisher)
@@ -202,7 +204,7 @@ func RunBatch(
 	<-finisher
 
 	var failedListParsed []int
-	failedList, err := storage.Get([]byte("failed"), nil)
+	failedList, err := storage.Get([]byte(FAILED_LIST_KEY), nil)
 	err = json.Unmarshal(failedList, failedListParsed)
 	fmt.Printf("Failed batches: %#v\n", len(failedList))
 
@@ -232,9 +234,9 @@ func batchSender(idx int, queue <-chan Batch, finisher chan bool) {
 		statusCode, body := requestScoring(false, batch.Data)
 		if statusCode == 200 {
 			batch.Result = body
-			storeFinishedBatch(&batch)
+			storeBatchResult(&batch, SUCCEED_LIST_KEY, "ok_%d")
 		} else {
-			storeFailedBatch(&batch)
+			storeBatchResult(&batch, FAILED_LIST_KEY, "err_%d")
 		}
 
 		counter, err := incrementCounter(BATCH_COUNTER)
@@ -242,7 +244,5 @@ func batchSender(idx int, queue <-chan Batch, finisher chan bool) {
 		if counter == uint64(totalBatches) {
 			finisher <- true
 		}
-
-		//processStatusCodes(statusCode, body)
 	}
 }
