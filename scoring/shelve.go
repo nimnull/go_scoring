@@ -82,3 +82,18 @@ func storeBatchList(listName string, batchId int) error {
 
 	return nil
 }
+
+func getBatchList(listName string) ([]int, error) {
+	var parsedList []int
+	storedList, err := storage.Get([]byte(listName), nil)
+
+	if err != nil {
+	return []int{}, err
+}
+	err = json.Unmarshal(storedList, parsedList)
+	if err != nil {
+		return []int{}, err
+	}
+
+	return parsedList, err
+}

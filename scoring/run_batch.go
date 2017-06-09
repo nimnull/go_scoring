@@ -2,7 +2,6 @@ package scoring
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -14,7 +13,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/buger/jsonparser"
-	"github.com/golang/leveldb"
+	//"github.com/golang/leveldb"
 
 	"go_scoring/csv"
 )
@@ -155,12 +154,6 @@ func RunBatch(
 
 	queue := make(chan Batch, 100)
 	finisher := make(chan bool, 1)
-	// init storage handler
-	storage, err = leveldb.Open(SHELVE_PATH, nil)
-	check(err, "DB Error:")
-
-	defer os.Remove(SHELVE_PATH)
-	defer storage.Close()
 
 	for j := 0; j < concurrent; j++ {
 		go batchSender(j, queue, finisher)
@@ -198,21 +191,31 @@ func RunBatch(
 			close(queue)
 			break
 		}
-
 	}
 
 	<-finisher
 
-	var failedListParsed []int
-	failedList, err := storage.Get([]byte(FAILED_LIST_KEY), nil)
-	err = json.Unmarshal(failedList, failedListParsed)
-	fmt.Printf("Failed batches: %#v\n", len(failedList))
+	failedList, err := getBatchList(FAILED_LIST_KEY)
+	fmt.Println("Failed: ", len(failedList))
+	succeedList, err := getBatchList(SUCCEED_LIST_KEY)
+	fmt.Println("Succeed: ", len(succeedList))
 
-	if len(failedList) {
-
+	if failedList, err := getBatchList(FAILED_LIST_KEY); err == nil && len(failedList) > 0 {
+		// TODO: implement!
+		fmt.Println("Process failed batches here")
+	} else {
+		check(err, "Unable to get failed batches")
 	}
 
-	fmt.Println("results assembling goes here")
+	if succeedList, err := getBatchList(SUCCEED_LIST_KEY); err == nil && len(succeedList) > 0 {
+		// TODO: implement!
+		fmt.Println("Process succeed batches here")
+		for _, v := range succeedList {
+			fmt.Println(v)
+		}
+	} else {
+		check(err, "Unable to get successful batches")
+	}
 
 	//fmt.Printf("Resp: %#v\n", string(body))
 
@@ -232,10 +235,11 @@ func batchSender(idx int, queue <-chan Batch, finisher chan bool) {
 	fmt.Println("Spawned worker", idx)
 	for batch := range queue {
 		statusCode, body := requestScoring(false, batch.Data)
-		if statusCode == 200 {
+		switch statusCode {
+		case 200:
 			batch.Result = body
 			storeBatchResult(&batch, SUCCEED_LIST_KEY, "ok_%d")
-		} else {
+		default:
 			storeBatchResult(&batch, FAILED_LIST_KEY, "err_%d")
 		}
 
