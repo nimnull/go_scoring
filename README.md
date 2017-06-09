@@ -1,13 +1,13 @@
-# DataRobot batch-scoring tool rewritten with golang
+# DataRobot batch-scoring tool rewritten with golang (POC)
 
 ## To install package with go tools use
 
 ```bash
-To install package with go tools use:
-
 go get github.com/nimnull/go_scoring
 go install github.com/nimnull/go_scoring
+```
 Note on PATH:
+```
 PATH=$GOPATH/bin:....
 ```
 
